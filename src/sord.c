@@ -31,6 +31,8 @@
 #include "sord_internal.h"
 
 #if ANDROID
+#include <android/log.h>"
+
 #define SORD_DEBUG_ITER
 #define SORD_DEBUG_SEARCH
 #define SORD_DEBUG_WRITE
