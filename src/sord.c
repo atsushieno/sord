@@ -36,7 +36,9 @@
 
 int avprintf(const char *fmt, va_list ap)
 {
-    return __android_log_print(ANDROID_LOG_INFO, "sord-android", fmt, ap);
+    /* I gave up, it's spitting out a bunch of inconsistent va_args... */
+    vfprintf(stderr, fmt, ap);
+    /*return __android_log_print(ANDROID_LOG_INFO, "sord-android", fmt, ap);*/
 }
 
 int aprintf (const char *fmt,...)
