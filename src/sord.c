@@ -34,12 +34,12 @@
 #if ANDROID
 #include <android/log.h>
 
-inline int avprintf(const char *fmt, va_list ap)
+int avprintf(const char *fmt, va_list ap)
 {
     return __android_log_print(ANDROID_LOG_INFO, "sord-android", fmt, ap);
 }
 
-inline int aprintf (const char *fmt,...)
+int aprintf (const char *fmt,...)
 {
     va_list ap;
     va_start (ap, fmt);
