@@ -42,7 +42,14 @@
 #  define SORD_LOG_FUNC(fmt, arg1)
 #endif
 
+#if ANDROID
+#define SORD_DEBUG_ITER
+#define SORD_DEBUG_SEARCH
+#define SORD_DEBUG_WRITE
+#define SORD_LOG(prefix, ...) __android_log_print(ANDROID_LOG_INFO, "Sord::" prefix, "[Sord::" prefix "] " __VA_ARGS__)
+#else
 #define SORD_LOG(prefix, ...) fprintf(stderr, "[Sord::" prefix "] " __VA_ARGS__)
+#endif
 
 #ifdef SORD_DEBUG_ITER
 #  define SORD_ITER_LOG(...) SORD_LOG("iter", __VA_ARGS__)
