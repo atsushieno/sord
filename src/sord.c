@@ -48,7 +48,8 @@ int aprintf (const char *fmt,...)
 
 #define SORD_DEBUG_ITER
 #define SORD_DEBUG_SEARCH
-#define SORD_DEBUG_WRITE
+/* looks like this is causing SIGSEGV for unmatched va_args. Disable it for now*/
+/*#define SORD_DEBUG_WRITE*/
 #define SORD_LOG(prefix, ...) aprintf("Sord::" prefix "] " __VA_ARGS__)
 
 #else
