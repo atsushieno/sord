@@ -30,13 +30,26 @@
 #include "sord_config.h"
 #include "sord_internal.h"
 
+
 #if ANDROID
 #include <android/log.h>
+
+inline int avprintf(const char *fmt, va_list ap)
+{
+    return __android_log_print(ANDROID_LOG_INFO, "sord-android", fmt, ap);
+}
+
+inline int aprintf (const char *fmt,...)
+{
+    va_list ap;
+    va_start (ap, fmt);
+    return avprintf(fmt, ap);
+}
 
 #define SORD_DEBUG_ITER
 #define SORD_DEBUG_SEARCH
 #define SORD_DEBUG_WRITE
-#define SORD_LOG(prefix, ...) __android_log_print(ANDROID_LOG_INFO, "Sord::" prefix, __VA_ARGS__)
+#define SORD_LOG(prefix, ...) aprintf("Sord::" prefix "] " __VA_ARGS__)
 
 #else
 #define SORD_LOG(prefix, ...) fprintf(stderr, "[Sord::" prefix "] " __VA_ARGS__)
