@@ -11,7 +11,7 @@ from waflib.extras import autowaf
 # major increment <=> incompatible changes
 # minor increment <=> compatible changes (additions)
 # micro increment <=> no interface changes
-SORD_VERSION       = '0.16.2'
+SORD_VERSION       = '0.16.4'
 SORD_MAJOR_VERSION = '0'
 
 # Mandatory waf variables
@@ -19,6 +19,11 @@ APPNAME = 'sord'        # Package name for waf dist
 VERSION = SORD_VERSION  # Package version for waf dist
 top     = '.'           # Source directory
 out     = 'build'       # Build directory
+
+# Release variables
+uri          = 'http://drobilla.net/sw/sord'
+dist_pattern = 'http://download.drobilla.net/sord-%d.%d.%d.tar.bz2'
+post_tags    = ['Hacking', 'RDF', 'Sord']
 
 def options(ctx):
     ctx.load('compiler_c')
@@ -53,9 +58,8 @@ def configure(conf):
     conf.env.BUILD_STATIC = (Options.options.static or
                              Options.options.static_progs)
 
-    autowaf.check_pkg(conf, 'serd-0', uselib_store='SERD',
-                      atleast_version='0.30.0', mandatory=True)
-    autowaf.check_pkg(conf, 'libpcre', uselib_store='PCRE', mandatory=False)
+    conf.check_pkg('serd-0 >= 0.30.0', uselib_store='SERD')
+    conf.check_pkg('libpcre', uselib_store='PCRE', mandatory=False)
 
     if conf.env.HAVE_PCRE:
         if conf.check(cflags=['-pthread'], mandatory=False):
@@ -73,11 +77,11 @@ def configure(conf):
     dump = Options.options.dump.split(',')
     all = 'all' in dump
     if all or 'iter' in dump:
-        autowaf.define(conf, 'SORD_DEBUG_ITER', 1)
+        conf.define('SORD_DEBUG_ITER', 1)
     if all or 'search' in dump:
-        autowaf.define(conf, 'SORD_DEBUG_SEARCH', 1)
+        conf.define('SORD_DEBUG_SEARCH', 1)
     if all or 'write' in dump:
-        autowaf.define(conf, 'SORD_DEBUG_WRITE', 1)
+        conf.define('SORD_DEBUG_WRITE', 1)
 
     autowaf.set_lib_env(conf, 'sord', SORD_VERSION)
     conf.write_config_header('sord_config.h', remove=False)
@@ -97,8 +101,9 @@ def build(bld):
     bld.install_files(includedir, bld.path.ant_glob('sord/*.hpp'))
 
     # Pkgconfig file
-    autowaf.build_pc(bld, 'SORD', SORD_VERSION, SORD_MAJOR_VERSION, 'SERD',
-                     {'SORD_MAJOR_VERSION' : SORD_MAJOR_VERSION})
+    autowaf.build_pc(bld, 'SORD', SORD_VERSION, SORD_MAJOR_VERSION, [],
+                     {'SORD_MAJOR_VERSION' : SORD_MAJOR_VERSION,
+                      'SORD_PKG_DEPS'      : 'serd-0'})
 
     source = 'src/sord.c src/syntax.c'
 
@@ -269,6 +274,11 @@ def test(tst):
             os.remove(i)
     except:
         pass
+
+    if sys.platform == 'win32' and '/DNDEBUG' not in tst.env.CFLAGS:
+        # FIXME: Sort out DLL memory freeing situation in next major version
+        Logs.warn("Skipping tests for Windows debug build")
+        return
 
     srcdir = tst.path.abspath()
     sordi = './sordi_static'
