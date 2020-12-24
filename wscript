@@ -11,7 +11,7 @@ from waflib.extras import autowaf
 # major increment <=> incompatible changes
 # minor increment <=> compatible changes (additions)
 # micro increment <=> no interface changes
-SORD_VERSION       = '0.16.4'
+SORD_VERSION       = '0.16.7'
 SORD_MAJOR_VERSION = '0'
 
 # Mandatory waf variables
@@ -51,12 +51,75 @@ def configure(conf):
 
     conf.load('autowaf', cache=True)
     autowaf.set_c_lang(conf, 'c99')
+    autowaf.set_cxx_lang(conf, 'c++11')
 
     conf.env.BUILD_UTILS  = not Options.options.no_utils
     conf.env.BUILD_SHARED = not Options.options.no_shared
     conf.env.STATIC_PROGS = Options.options.static_progs
     conf.env.BUILD_STATIC = (Options.options.static or
                              Options.options.static_progs)
+
+    if Options.options.ultra_strict:
+        autowaf.add_compiler_flags(conf.env, '*', {
+            'gcc': [
+                '-Wno-cast-align',
+                '-Wno-cast-qual',
+                '-Wno-conversion',
+                '-Wno-inline',
+                '-Wno-padded',
+                '-Wno-sign-conversion',
+                '-Wno-stack-protector',
+                '-Wno-suggest-attribute=const',
+                '-Wno-suggest-attribute=pure',
+                '-Wno-switch-enum',
+                '-Wno-unused-macros',
+                '-Wno-unused-parameter',
+                '-Wno-vla',
+            ],
+            'clang': [
+                '-Wno-cast-align',
+                '-Wno-cast-qual',
+                '-Wno-format-nonliteral',
+                '-Wno-nullability-extension',
+                '-Wno-padded',
+                '-Wno-reserved-id-macro',
+                '-Wno-shorten-64-to-32',
+                '-Wno-sign-conversion',
+                '-Wno-switch-enum',
+                '-Wno-unused-macros',
+                '-Wno-unused-parameter',
+                '-Wno-vla',
+            ],
+            'msvc': [
+                '/wd4061',  # enumerator in switch is not explicitly handled
+                '/wd4100',  # unreferenced formal parameter
+                '/wd4200',  # zero-sized array in struct/union
+                '/wd4244',  # conversion with possible loss of data
+                '/wd4267',  # conversion from size_t to a smaller type
+                '/wd4365',  # signed/unsigned mismatch
+                '/wd4389',  # '==': signed/unsigned mismatch
+                '/wd4514',  # unreferenced inline function has been removed
+                '/wd4702',  # unreachable code
+                '/wd4706',  # assignment within conditional expression
+                '/wd4820',  # padding added after construct
+                '/wd5045',  # will insert Spectre mitigation for memory load
+            ],
+        })
+
+        autowaf.add_compiler_flags(conf.env, 'cxx', {
+            'gcc': [
+                '-Wno-effc++',
+                '-Wno-multiple-inheritance',
+            ],
+            'clang': [
+                '-Wno-implicit-float-conversion',
+            ],
+            'msvc': [
+                '/wd4571',  # catch semantics changed
+                '/wd4625',  # copy constructor implicitly deleted
+                '/wd4626',  # assignment opreator implicitly deleted
+            ],
+        })
 
     conf.check_pkg('serd-0 >= 0.30.0', uselib_store='SERD')
     conf.check_pkg('libpcre', uselib_store='PCRE', mandatory=False)
@@ -83,7 +146,12 @@ def configure(conf):
     if all or 'write' in dump:
         conf.define('SORD_DEBUG_WRITE', 1)
 
+    # Set up environment for building/using as a subproject
     autowaf.set_lib_env(conf, 'sord', SORD_VERSION)
+    if conf.env.BUILD_UTILS and conf.env.HAVE_PCRE:
+        sord_validate_node = conf.path.get_bld().make_node('sord_validate')
+        conf.env.SORD_VALIDATE = [sord_validate_node.abspath()]
+
     conf.write_config_header('sord_config.h', remove=False)
 
     autowaf.display_summary(
@@ -237,8 +305,6 @@ def build(bld):
     bld.install_files('${MANDIR}/man1', bld.path.ant_glob('doc/*.1'))
 
     bld.add_post_fun(autowaf.run_ldconfig)
-    if bld.env.DOCS:
-        bld.add_post_fun(fix_docs)
 
 def lint(ctx):
     "checks code for style issues"
@@ -254,10 +320,6 @@ def lint(ctx):
            "-readability-else-after-return\" " +
            "../src/*.c")
     subprocess.call(cmd, cwd='build', shell=True)
-
-def fix_docs(ctx):
-    if ctx.cmd == 'build':
-        autowaf.make_simple_dox(APPNAME)
 
 def upload_docs(ctx):
     os.system('rsync -ravz --delete -e ssh build/doc/html/ drobilla@drobilla.net:~/drobilla.net/docs/sord/')
@@ -275,16 +337,11 @@ def test(tst):
     except:
         pass
 
-    if sys.platform == 'win32' and '/DNDEBUG' not in tst.env.CFLAGS:
-        # FIXME: Sort out DLL memory freeing situation in next major version
-        Logs.warn("Skipping tests for Windows debug build")
-        return
-
     srcdir = tst.path.abspath()
     sordi = './sordi_static'
     base = 'http://example.org/'
     snippet = '<{0}s> <{0}p> <{0}o> .\n'.format(base)
-    manifest = 'file://%s/tests/manifest.ttl' % srcdir
+    manifest = 'file://%s/tests/manifest.ttl' % srcdir.replace('\\', '/')
 
     with tst.group('Unit') as check:
         check(['./sord_test'])

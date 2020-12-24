@@ -1,8 +1,23 @@
+sord (0.16.7) unstable;
+
+  * Clean up code
+  * Fix potential undefined behavior
+  * Fix potentially incorrect search results
+
+ -- David Robillard <d@drobilla.net>  Wed, 11 Nov 2020 21:04:28 +0000
+
+sord (0.16.6) stable;
+
+  * Fix potential crash or incorrectness issues with GCC 10
+  * Fix various minor warnings and other code quality issues
+
+ -- David Robillard <d@drobilla.net>  Sun, 27 Sep 2020 11:08:18 +0000
+
 sord (0.16.4) stable;
 
   * Update build system
 
- -- David Robillard <d@drobilla.net>  Sun, 10 Nov 2019 22:26:16 +0100
+ -- David Robillard <d@drobilla.net>  Sun, 10 Nov 2019 21:26:16 +0000
 
 sord (0.16.2) stable;
 

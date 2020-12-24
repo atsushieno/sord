@@ -14,21 +14,33 @@
   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
-// C99
+#include "sord_config.h" // IWYU pragma: keep
+#include "sord_internal.h"
+
+#include "serd/serd.h"
+#include "sord/sord.h"
+
+#define ZIX_INLINE
+#include "zix/btree.c"
+#include "zix/btree.h"
+#include "zix/common.h"
+#include "zix/digest.c"
+#include "zix/hash.c"
+#include "zix/hash.h"
+
 #include <assert.h>
-#include <errno.h>
+#include <stdarg.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#define ZIX_INLINE
-#include "zix/digest.c"
-#include "zix/hash.c"
-#include "zix/btree.c"
-
-#include "sord_config.h"
-#include "sord_internal.h"
+#ifdef __GNUC__
+#    define SORD_LOG_FUNC(fmt, arg1) __attribute__((format(printf, fmt, arg1)))
+#else
+#    define SORD_LOG_FUNC(fmt, arg1)
+#endif
 
 
 #if ANDROID
@@ -88,9 +100,6 @@ int aprintf (const char *fmt,...)
 	TUP_FMT_ELEM((t)[2]), \
 	TUP_FMT_ELEM((t)[3])
 
-#define TUP_S 0
-#define TUP_P 1
-#define TUP_O 2
 #define TUP_G 3
 
 /** Triple ordering */
@@ -199,6 +208,7 @@ sord_node_hash_equal(const void* a, const void* b)
 		    (serd_node_equals(&a_node->node, &b_node->node)));
 }
 
+SORD_LOG_FUNC(3, 4)
 static void
 error(SordWorld* world, SerdStatus st, const char* fmt, ...)
 {
@@ -254,6 +264,42 @@ sord_world_set_error_sink(SordWorld*    world,
 	world->error_handle = handle;
 }
 
+static inline int
+sord_node_compare_literal(const SordNode* a, const SordNode* b)
+{
+	const int cmp = strcmp((const char*)sord_node_get_string(a),
+	                       (const char*)sord_node_get_string(b));
+	if (cmp != 0) {
+		return cmp;
+	}
+
+	const bool a_has_lang     = a->meta.lit.lang[0];
+	const bool b_has_lang     = b->meta.lit.lang[0];
+	const bool a_has_datatype = a->meta.lit.datatype;
+	const bool b_has_datatype = b->meta.lit.datatype;
+	const bool a_has_meta     = a_has_lang || a_has_datatype;
+	const bool b_has_meta     = b_has_lang || b_has_datatype;
+
+	assert(!(a_has_lang && a_has_datatype));
+	assert(!(b_has_lang && b_has_datatype));
+
+	if (!a_has_meta && !b_has_meta) {
+		return 0;
+	} else if (!a_has_meta || (a_has_lang && b_has_datatype)) {
+		return -1;
+	} else if (!b_has_meta || (a_has_datatype && b_has_lang)) {
+		return 1;
+	} else if (a_has_lang) {
+		assert(b_has_lang);
+		return strcmp(a->meta.lit.lang, b->meta.lit.lang);
+	}
+
+	assert(a_has_datatype);
+	assert(b_has_datatype);
+	return strcmp((const char*)a->meta.lit.datatype->node.buf,
+	              (const char*)b->meta.lit.datatype->node.buf);
+}
+
 /** Compare nodes, considering NULL a wildcard match. */
 static inline int
 sord_node_compare(const SordNode* a, const SordNode* b)
@@ -261,7 +307,7 @@ sord_node_compare(const SordNode* a, const SordNode* b)
 	if (a == b || !a || !b) {
 		return 0;  // Exact or wildcard match
 	} else if (a->node.type != b->node.type) {
-		return a->node.type - b->node.type;
+		return (a->node.type < b->node.type) ? -1 : 1;
 	}
 
 	int cmp = 0;
@@ -270,20 +316,8 @@ sord_node_compare(const SordNode* a, const SordNode* b)
 	case SERD_BLANK:
 		return strcmp((const char*)a->node.buf, (const char*)b->node.buf);
 	case SERD_LITERAL:
-		cmp = strcmp((const char*)sord_node_get_string(a),
-		             (const char*)sord_node_get_string(b));
-		if (cmp == 0) {
-			// Note: Can't use sord_node_compare here since it does wildcards
-			if (!a->meta.lit.datatype || !b->meta.lit.datatype) {
-				cmp = a->meta.lit.datatype - b->meta.lit.datatype;
-			} else {
-				cmp = strcmp((const char*)a->meta.lit.datatype->node.buf,
-				             (const char*)b->meta.lit.datatype->node.buf);
-			}
-		}
-		if (cmp == 0) {
-			cmp = strcmp(a->meta.lit.lang, b->meta.lit.lang);
-		}
+		cmp = sord_node_compare_literal(a, b);
+		break;
 	default:
 		break;
 	}
@@ -324,7 +358,7 @@ sord_quad_match(const SordQuad x, const SordQuad y)
    other possible ID, except itself.
 */
 static int
-sord_quad_compare(const void* x_ptr, const void* y_ptr, void* user_data)
+sord_quad_compare(const void* x_ptr, const void* y_ptr, const void* user_data)
 {
 	const int* const           ordering = (const int*)user_data;
 	const SordNode*const*const x        = (const SordNode*const*)x_ptr;
@@ -712,6 +746,9 @@ sord_node_free_internal(SordWorld* world, SordNode* node)
 {
 	assert(node->refs == 0);
 
+	// If you hit this, the world has probably been destroyed too early
+	assert(world);
+
 	// Cache pointer to buffer to free after node removal and destruction
 	const uint8_t* const buf = node->node.buf;
 
@@ -829,7 +866,7 @@ sord_find(SordModel* model, const SordQuad pat)
 	int             n_prefix;
 	const SordOrder index_order = sord_best_index(model, pat, &mode, &n_prefix);
 
-	SORD_FIND_LOG("Find " TUP_FMT "  index=%s  mode=%d  n_prefix=%d\n",
+	SORD_FIND_LOG("Find " TUP_FMT "  index=%s  mode=%u  n_prefix=%d\n",
 	              TUP_FMT_ARGS(pat), order_names[index_order], mode, n_prefix);
 
 	if (pat[0] && pat[1] && pat[2] && pat[3]) {
@@ -838,7 +875,24 @@ sord_find(SordModel* model, const SordQuad pat)
 
 	ZixBTree* const db  = model->indices[index_order];
 	ZixBTreeIter*   cur = NULL;
-	zix_btree_lower_bound(db, pat, &cur);
+
+	if (mode == FILTER_ALL) {
+		// No prefix shared with an index at all, linear search (worst case)
+		cur = zix_btree_begin(db);
+	} else if (mode == FILTER_RANGE) {
+		/* Some prefix, but filtering still required.  Build a search pattern
+		   with only the prefix to find the lower bound in log time. */
+		SordQuad         prefix_pat = { NULL, NULL, NULL, NULL };
+		const int* const ordering   = orderings[index_order];
+		for (int i = 0; i < n_prefix; ++i) {
+			prefix_pat[ordering[i]] = pat[ordering[i]];
+		}
+		zix_btree_lower_bound(db, prefix_pat, &cur);
+	} else {
+		// Ideal case, pattern matches an index with no filtering required
+		zix_btree_lower_bound(db, pat, &cur);
+	}
+
 	if (zix_btree_iter_is_end(cur)) {
 		SORD_FIND_LOG("No match found\n");
 		zix_btree_iter_free(cur);
@@ -1003,7 +1057,7 @@ static SordNode*
 sord_insert_node(SordWorld* world, const SordNode* key, bool copy)
 {
 	SordNode* node = NULL;
-	ZixStatus st   = zix_hash_insert(world->nodes, key, (const void**)&node);
+	ZixStatus st   = zix_hash_insert(world->nodes, key, (void**)&node);
 	switch (st) {
 	case ZIX_STATUS_EXISTS:
 		++node->refs;
@@ -1106,7 +1160,7 @@ sord_new_literal_counted(SordWorld*     world,
 	key.meta.lit.datatype = sord_node_copy(datatype);
 	memset(key.meta.lit.lang, 0, sizeof(key.meta.lit.lang));
 	if (lang) {
-		strncpy(key.meta.lit.lang, lang, sizeof(key.meta.lit.lang));
+		strncpy(key.meta.lit.lang, lang, sizeof(key.meta.lit.lang) - 1);
 	}
 
 	return sord_insert_node(world, &key, true);
@@ -1142,7 +1196,7 @@ sord_node_from_serd_node(SordWorld*      world,
 		return NULL;
 	case SERD_LITERAL:
 		datatype_node = sord_node_from_serd_node(
-			world, env, datatype, NULL, NULL),
+			world, env, datatype, NULL, NULL);
 		ret = sord_new_literal_counted(
 			world,
 			datatype_node,

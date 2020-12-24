@@ -17,14 +17,13 @@
 #ifndef ZIX_BTREE_H
 #define ZIX_BTREE_H
 
-#include <stddef.h>
-
 #include "zix/common.h"
+
+#include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
-#else
-#    include <stdbool.h>
 #endif
 
 /**
@@ -57,7 +56,7 @@ typedef struct ZixBTreeIterImpl ZixBTreeIter;
 */
 ZIX_API ZixBTree*
 zix_btree_new(ZixComparator  cmp,
-              void*          cmp_data,
+              const void*    cmp_data,
               ZixDestroyFunc destroy);
 
 /**
@@ -69,7 +68,7 @@ zix_btree_free(ZixBTree* t);
 /**
    Return the number of elements in `t`.
 */
-ZIX_API size_t
+ZIX_PURE_API size_t
 zix_btree_size(const ZixBTree* t);
 
 /**
@@ -114,7 +113,7 @@ zix_btree_lower_bound(const ZixBTree* t, const void* e, ZixBTreeIter** ti);
 /**
    Return the data associated with the given tree item.
 */
-ZIX_API void*
+ZIX_PURE_API void*
 zix_btree_get(const ZixBTreeIter* ti);
 
 /**
@@ -122,13 +121,33 @@ zix_btree_get(const ZixBTreeIter* ti);
 
    The returned iterator must be freed with zix_btree_iter_free().
 */
-ZIX_API ZixBTreeIter*
+ZIX_PURE_API ZixBTreeIter*
 zix_btree_begin(const ZixBTree* t);
+
+/**
+   Return an iterator to the end of `t` (one past the last element).
+
+   The returned iterator must be freed with zix_btree_iter_free().
+*/
+ZIX_API ZixBTreeIter*
+zix_btree_end(const ZixBTree* t);
+
+/**
+   Return a new copy of `i`.
+*/
+ZIX_API ZixBTreeIter*
+zix_btree_iter_copy(const ZixBTreeIter* i);
+
+/**
+   Return true iff `lhs` is equal to `rhs`.
+*/
+ZIX_PURE_API bool
+zix_btree_iter_equals(const ZixBTreeIter* lhs, const ZixBTreeIter* rhs);
 
 /**
    Return true iff `i` is an iterator to the end of its tree.
 */
-ZIX_API bool
+ZIX_PURE_API bool
 zix_btree_iter_is_end(const ZixBTreeIter* i);
 
 /**

@@ -21,11 +21,11 @@
 #ifndef SORD_SORD_H
 #define SORD_SORD_H
 
+#include "serd/serd.h"
+
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-
-#include "serd/serd.h"
 
 #ifdef SORD_SHARED
 #    ifdef _WIN32
@@ -46,8 +46,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-#else
-#    include <stdbool.h>
 #endif
 
 /**

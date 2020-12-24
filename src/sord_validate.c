@@ -17,14 +17,6 @@
 #define _BSD_SOURCE     1  // for realpath
 #define _DEFAULT_SOURCE 1  // for realpath
 
-#include <assert.h>
-#include <stdlib.h>
-#include <string.h>
-
-#ifdef _WIN32
-#    include <windows.h>
-#endif
-
 #include "serd/serd.h"
 #include "sord/sord.h"
 #include "sord_config.h"
@@ -32,8 +24,22 @@
 #ifdef HAVE_PCRE
 #    include <pcre.h>
 #endif
+#ifdef _WIN32
+#    include <windows.h>
+#endif
 
-#define USTR(s) ((const uint8_t*)(s))
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#ifdef __GNUC__
+#    define SORD_LOG_FUNC(fmt, arg1) __attribute__((format(printf, fmt, arg1)))
+#else
+#    define SORD_LOG_FUNC(fmt, arg1)
+#endif
 
 #define NS_foaf (const uint8_t*)"http://xmlns.com/foaf/0.1/"
 #define NS_owl  (const uint8_t*)"http://www.w3.org/2002/07/owl#"
@@ -81,9 +87,9 @@ typedef struct {
 	SordNode* xsd_string;
 } URIs;
 
-int  n_errors        = 0;
-int  n_restrictions  = 0;
-bool one_line_errors = false;
+static int  n_errors        = 0;
+static int  n_restrictions  = 0;
+static bool one_line_errors = false;
 
 static int
 print_version(void)
@@ -127,6 +133,7 @@ absolute_path(const uint8_t* path)
 #endif
 }
 
+SORD_LOG_FUNC(2, 3)
 static int
 errorf(const SordQuad quad, const char* fmt, ...)
 {
@@ -491,7 +498,7 @@ check_properties(SordModel* model, URIs* uris)
 
 		if (is_FunctionalProperty) {
 			SordIter*      o = sord_search(model, subj, pred, NULL, NULL);
-			const uint64_t n = count_non_blanks(o, SORD_OBJECT);
+			const unsigned n = count_non_blanks(o, SORD_OBJECT);
 			if (n > 1) {
 				st = errorf(quad, "Functional property with %u objects", n);
 			}
@@ -707,9 +714,11 @@ main(int argc, char** argv)
 	SerdReader* reader = sord_new_reader(model, env, SERD_TURTLE, NULL);
 
 	for (; a < argc; ++a) {
-		const uint8_t* input   = (const uint8_t*)argv[a];
-		uint8_t*       in_path = absolute_path(serd_uri_to_path(input));
+		const uint8_t* input       = (const uint8_t*)argv[a];
+		uint8_t*       rel_in_path = serd_file_uri_parse(input, NULL);
+		uint8_t*       in_path     = absolute_path(rel_in_path);
 
+		free(rel_in_path);
 		if (!in_path) {
 			fprintf(stderr, "Skipping file %s\n", input);
 			continue;

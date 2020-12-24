@@ -17,15 +17,16 @@
 #ifndef SORD_SORD_INTERNAL_H
 #define SORD_SORD_INTERNAL_H
 
-#include <stddef.h>
-#include <stdint.h>
-
+#include "serd/serd.h"
 #include "sord/sord.h"
 
-#if __GNUC__ > 4 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 5)
+#include <stddef.h>
+
+#if defined(__GNUC__) && __GNUC__ > 4
 #    define SORD_UNREACHABLE() __builtin_unreachable()
 #else
-#    define SORD_UNREACHABLE() assert(false)
+#    include <assert.h>
+#    define SORD_UNREACHABLE() assert(0)
 #endif
 
 /** Resource node metadata */
