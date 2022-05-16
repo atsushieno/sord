@@ -43,10 +43,12 @@
 #endif
 
 #if ANDROID
-#define SORD_DEBUG_ITER
-#define SORD_DEBUG_SEARCH
-#define SORD_DEBUG_WRITE
-#define SORD_LOG(prefix, ...) __android_log_print(ANDROID_LOG_INFO, "Sord::" prefix, "[Sord::" prefix "] " __VA_ARGS__)
+// In sord, you can #define SORD_DEBUG_ITER, SORD_DEBUG_SEARCH, and SORT_DEBUG_WRITE to dump debugging lines.
+#define SORD_DEBUG_ITER 1
+#define SORD_DEBUG_SEARCH 1
+#define SORT_DEBUG_WRITE 1
+#include <android/log.h>
+#define SORD_LOG(prefix, ...) __android_log_print(ANDROID_LOG_DEBUG, "sord-android", "[Sord::" prefix "] " __VA_ARGS__)
 #else
 #define SORD_LOG(prefix, ...) fprintf(stderr, "[Sord::" prefix "] " __VA_ARGS__)
 #endif
