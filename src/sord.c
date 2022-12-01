@@ -44,11 +44,18 @@
 
 #if ANDROID
 // In sord, you can #define SORD_DEBUG_ITER, SORD_DEBUG_SEARCH, and SORT_DEBUG_WRITE to dump debugging lines.
+#ifdef SORD_ANDROID_LOGGING_ENABLED
 #define SORD_DEBUG_ITER 1
 #define SORD_DEBUG_SEARCH 1
 #define SORT_DEBUG_WRITE 1
 #include <android/log.h>
 #define SORD_LOG(prefix, ...) __android_log_print(ANDROID_LOG_DEBUG, "sord-android", "[Sord::" prefix "] " __VA_ARGS__)
+#else
+#define SORD_DEBUG_ITER 0
+#define SORD_DEBUG_SEARCH 0
+#define SORT_DEBUG_WRITE 0
+#define SORD_LOG(prefix, ...) /* do nothing */
+#endif
 #else
 #define SORD_LOG(prefix, ...) fprintf(stderr, "[Sord::" prefix "] " __VA_ARGS__)
 #endif
